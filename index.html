@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProverPrev — Protocolo Data Certa</title>
+<meta name="description" content="Descubra a data exata em que você pode se aposentar, com o histórico real de contribuição analisado por profissionais.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --ink:        #0E1012;
+  --ink-soft:   #16181B;
+  --ink-line:   rgba(247,245,240,0.12);
+  --ink-line-soft: rgba(247,245,240,0.06);
+  --paper:      #F7F4EE;
+  --paper-dim:  #EFEAE0;
+  --paper-line: rgba(18,16,12,0.10);
+  --brass:      #A9824C;
+  --brass-light:#CBA876;
+  --brass-deep: #8A6A3B;
+  --text-on-paper:      #1B1A17;
+  --text-on-paper-mute: #6E6A5E;
+  --text-on-ink:        #F4F1E9;
+  --text-on-ink-mute:   #9C9890;
+
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
+
+  --container: 1180px;
+  --gutter: clamp(24px, 6vw, 96px);
+  --section-pad: clamp(88px, 12vw, 168px);
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto;}
+  *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+}
+
+body{
+  font-family:var(--sans);
+  background:var(--paper);
+  color:var(--text-on-paper);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+img,svg{display:block;max-width:100%;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+ul{list-style:none;}
+
+.wrap{
+  max-width:var(--container);
+  margin:0 auto;
+  padding-left:var(--gutter);
+  padding-right:var(--gutter);
+}
+
+section{position:relative;}
+
+.section-pad{padding-top:var(--section-pad);padding-bottom:var(--section-pad);}
+
+.on-ink{background:var(--ink);color:var(--text-on-ink);}
+.on-paper{background:var(--paper);color:var(--text-on-paper);}
+.on-paper-dim{background:var(--paper-dim);color:var(--text-on-paper);}
+
+/* subtle grain texture, luxury paper feel */
+.grain{position:relative;}
+.grain::before{
+  content:"";
+  position:absolute;inset:0;
+  pointer-events:none;
+  opacity:0.035;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.on-ink.grain::before{mix-blend-mode:overlay;opacity:0.05;}
+
+/* ============================================================
+   TYPE
+   ============================================================ */
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.22em;
+  text-transform:uppercase;
+  color:var(--brass);
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:22px;
+}
+.eyebrow::before{
+  content:"";
+  width:18px;height:1px;
+  background:var(--brass);
+  display:inline-block;
+}
+
+h1,h2,h3{
+  font-family:var(--serif);
+  font-weight:500;
+  letter-spacing:-0.01em;
+  line-height:1.08;
+}
+
+h1{
+  font-size:clamp(2.4rem, 5.4vw, 4.6rem);
+  font-weight:500;
+  max-width:16ch;
+}
+
+h2{
+  font-size:clamp(1.9rem, 3.6vw, 3.1rem);
+  max-width:18ch;
+}
+
+h3{
+  font-size:clamp(1.3rem, 2vw, 1.7rem);
+  font-weight:500;
+}
+
+.lede{
+  font-size:clamp(1.05rem, 1.4vw, 1.25rem);
+  color:var(--text-on-paper-mute);
+  max-width:56ch;
+  font-weight:400;
+}
+.on-ink .lede{color:var(--text-on-ink-mute);}
+
+.body-text{
+  font-size:1.02rem;
+  color:var(--text-on-paper-mute);
+  max-width:62ch;
+}
+.on-ink .body-text{color:var(--text-on-ink-mute);}
+
+.small-caps{
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:var(--brass);
+}
+
+/* ============================================================
+   REVEAL ON SCROLL
+   ============================================================ */
+.reveal{
+  opacity:0;
+  transform:translateY(28px);
+  transition:opacity 0.9s var(--ease), transform 0.9s var(--ease);
+}
+.reveal.is-visible{opacity:1;transform:translateY(0);}
+.reveal-delay-1{transition-delay:0.08s;}
+.reveal-delay-2{transition-delay:0.16s;}
+.reveal-delay-3{transition-delay:0.24s;}
+.reveal-delay-4{transition-delay:0.32s;}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav{
+  position:fixed;
+  top:0;left:0;right:0;
+  z-index:100;
+  padding:26px var(--gutter);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  transition:padding 0.4s var(--ease), background 0.4s var(--ease), border-color 0.4s var(--ease);
+  border-bottom:1px solid transparent;
+}
+.nav.scrolled{
+  padding-top:16px;
+  padding-bottom:16px;
+  background:rgba(14,16,18,0.82);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--ink-line-soft);
+}
+.nav-logo{
+  font-family:var(--serif);
+  font-style:italic;
+  font-size:1.25rem;
+  color:var(--text-on-ink);
+  display:flex;align-items:center;gap:8px;
+  letter-spacing:0.01em;
+}
+.nav-logo .dot{width:5px;height:5px;border-radius:50%;background:var(--brass);}
+.nav-links{
+  display:flex;
+  gap:40px;
+  font-size:13px;
+  color:var(--text-on-ink-mute);
+}
+.nav-links a{transition:color 0.3s var(--ease);}
+.nav-links a:hover{color:var(--text-on-ink);}
+.nav-cta{
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:0.05em;
+  color:var(--text-on-ink);
+  border:1px solid var(--ink-line);
+  padding:10px 20px;
+  border-radius:2px;
+  transition:border-color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.nav-cta:hover{border-color:var(--brass);background:rgba(169,130,76,0.08);}
+@media (max-width:860px){.nav-links{display:none;}}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  font-family:var(--mono);
+  font-size:13px;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  padding:18px 34px;
+  border-radius:2px;
+  position:relative;
+  overflow:hidden;
+  transition:transform 0.45s var(--ease), box-shadow 0.45s var(--ease);
+}
+.btn-primary{
+  background:var(--brass);
+  color:#15130E;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 40px -14px rgba(169,130,76,0.55);}
+.btn-ghost-ink{
+  border:1px solid var(--ink-line);
+  color:var(--text-on-ink);
+}
+.btn-ghost-ink:hover{border-color:var(--brass);transform:translateY(-2px);}
+.btn-ghost-paper{
+  border:1px solid var(--paper-line);
+  color:var(--text-on-paper);
+}
+.btn-ghost-paper:hover{border-color:var(--brass);transform:translateY(-2px);}
+.btn-arrow{transition:transform 0.4s var(--ease);}
+.btn:hover .btn-arrow{transform:translateX(4px);}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  min-height:100svh;
+  display:flex;
+  align-items:center;
+  padding-top:140px;
+  padding-bottom:90px;
+  overflow:hidden;
+}
+.hero-inner{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:56px;
+}
+.hero-text{max-width:760px;}
+.hero-text h1{margin-bottom:26px;color:var(--text-on-ink);}
+.hero-text .lede{margin-bottom:0;}
+
+.hero-bg-curve{
+  position:absolute;
+  top:0;right:-6%;
+  width:64%;
+  height:100%;
+  opacity:0.55;
+  pointer-events:none;
+  z-index:0;
+}
+.hero-inner, .hero-cta-row, .hero-list{position:relative;z-index:1;}
+
+.hero-cta-row{
+  display:flex;
+  align-items:center;
+  gap:28px;
+  margin-top:44px;
+  flex-wrap:wrap;
+}
+.hero-cta-note{
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--text-on-ink-mute);
+  letter-spacing:0.02em;
+}
+
+.hero-list{
+  margin-top:64px;
+  border-top:1px solid var(--ink-line);
+}
+.hero-list-row{
+  display:grid;
+  grid-template-columns:64px 1fr 1fr;
+  gap:28px;
+  padding:26px 0;
+  border-bottom:1px solid var(--ink-line);
+  align-items:start;
+}
+.hero-list-index{
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--brass);
+  padding-top:4px;
+}
+.hero-list-title{
+  font-family:var(--serif);
+  font-size:1.08rem;
+  font-weight:500;
+  color:var(--text-on-ink);
+  max-width:28ch;
+}
+.hero-list-desc{
+  font-size:0.92rem;
+  color:var(--text-on-ink-mute);
+  max-width:46ch;
+}
+@media (max-width:760px){
+  .hero-list-row{grid-template-columns:32px 1fr;}
+  .hero-list-desc{grid-column:2 / 3;}
+}
+
+/* video block */
+.hero-video{
+  margin-top:80px;
+  position:relative;
+  border:1px solid var(--ink-line);
+  aspect-ratio:16/8.2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(160deg, #14161A 0%, #0B0C0E 100%);
+  cursor:pointer;
+  z-index:1;
+}
+.hero-video::after{
+  content:"";
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle at 20% 20%, rgba(169,130,76,0.10), transparent 55%);
+}
+.play-ring{
+  width:74px;height:74px;
+  border-radius:50%;
+  border:1px solid var(--brass-light);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;z-index:1;
+  transition:transform 0.4s var(--ease), background 0.4s var(--ease);
+}
+.hero-video:hover .play-ring{transform:scale(1.08);background:rgba(169,130,76,0.12);}
+.play-ring::before{
+  content:"";
+  width:0;height:0;
+  border-top:9px solid transparent;
+  border-bottom:9px solid transparent;
+  border-left:14px solid var(--brass-light);
+  margin-left:4px;
+}
+.hero-video-label{
+  position:absolute;
+  bottom:22px;left:26px;
+  font-family:var(--mono);
+  font-size:11.5px;
+  letter-spacing:0.06em;
+  color:var(--text-on-ink-mute);
+  z-index:1;
+}
+
+/* ============================================================
+   PROBLEM
+   ============================================================ */
+.problem-grid{
+  display:grid;
+  grid-template-columns:0.9fr 1.1fr;
+  gap:80px;
+}
+@media (max-width:900px){.problem-grid{grid-template-columns:1fr;gap:48px;}}
+.problem-sticky{position:sticky;top:140px;align-self:start;}
+.problem-scenes{display:flex;flex-direction:column;gap:44px;}
+.scene{
+  padding-top:32px;
+  border-top:1px solid var(--paper-line);
+}
+.scene p{font-size:1.06rem;color:var(--text-on-paper);max-width:56ch;}
+.scene .tag{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--text-on-paper-mute);
+  display:block;margin-bottom:14px;
+}
+.problem-close{
+  margin-top:56px;
+  padding-top:40px;
+  border-top:1px solid var(--paper-line);
+}
+.problem-close p{font-size:1.16rem;font-family:var(--serif);font-weight:400;font-style:italic;max-width:52ch;color:var(--text-on-paper);}
+
+/* ============================================================
+   SOCIAL PROOF SHORT
+   ============================================================ */
+.proof-strip{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border-top:1px solid var(--ink-line);
+}
+.proof-card{
+  padding:44px 48px;
+  border-bottom:1px solid var(--ink-line);
+}
+.proof-card:first-child{border-right:1px solid var(--ink-line);}
+@media (max-width:760px){
+  .proof-strip{grid-template-columns:1fr;}
+  .proof-card:first-child{border-right:none;}
+}
+.proof-name{font-family:var(--serif);font-size:1.15rem;color:var(--text-on-ink);margin-bottom:4px;}
+.proof-meta{font-family:var(--mono);font-size:11.5px;color:var(--brass);letter-spacing:0.04em;margin-bottom:20px;display:block;}
+.proof-card p{color:var(--text-on-ink-mute);font-size:0.98rem;max-width:48ch;}
+
+/* ============================================================
+   MID CTA
+   ============================================================ */
+.midcta{
+  text-align:center;
+  padding-top:120px;padding-bottom:120px;
+}
+.midcta h2{margin:0 auto 40px auto;}
+.midcta-inner{display:flex;flex-direction:column;align-items:center;}
+
+/* ============================================================
+   METHOD — signature timeline
+   ============================================================ */
+.method-head{max-width:680px;margin-bottom:96px;}
+.method-head h2{margin-bottom:24px;color:var(--text-on-paper);}
+
+.timeline{
+  position:relative;
+  display:grid;
+  grid-template-columns:56px 1fr;
+  column-gap:40px;
+}
+.timeline-rail{
+  grid-column:1;
+  position:relative;
+  display:flex;justify-content:center;
+}
+.timeline-rail-track{
+  position:absolute;
+  top:6px;bottom:6px;
+  width:1px;
+  background:var(--paper-line);
+}
+.timeline-rail-fill{
+  position:absolute;
+  top:6px;left:50%;
+  width:1px;
+  background:var(--brass);
+  height:0%;
+  transform:translateX(-50%);
+  transition:height 0.1s linear;
+}
+.timeline-steps{grid-column:2;display:flex;flex-direction:column;gap:96px;}
+.tl-step{position:relative;}
+.tl-dot{
+  position:absolute;
+  left:calc(-40px - 28px);
+  top:4px;
+  width:9px;height:9px;
+  border-radius:50%;
+  background:var(--paper);
+  border:1px solid var(--brass);
+  transition:background 0.4s var(--ease), box-shadow 0.4s var(--ease);
+}
+.tl-step.active .tl-dot{background:var(--brass);box-shadow:0 0 0 5px rgba(169,130,76,0.14);}
+.tl-num{
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--brass);
+  letter-spacing:0.08em;
+  display:block;
+  margin-bottom:14px;
+}
+.tl-step h3{margin-bottom:14px;color:var(--text-on-paper);}
+.tl-step p{color:var(--text-on-paper-mute);max-width:58ch;font-size:1rem;}
+@media (max-width:700px){
+  .timeline{grid-template-columns:20px 1fr;column-gap:22px;}
+  .tl-dot{left:calc(-22px - 12px);}
+}
+
+.method-foot{
+  margin-top:100px;
+  padding-top:48px;
+  border-top:1px solid var(--paper-line);
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:60px;
+}
+@media (max-width:800px){.method-foot{grid-template-columns:1fr;}}
+.method-foot p{color:var(--text-on-paper-mute);font-size:0.98rem;}
+.method-highlight{
+  font-family:var(--serif);
+  font-style:italic;
+  font-size:1.15rem;
+  color:var(--text-on-paper);
+  border-left:1px solid var(--brass);
+  padding-left:24px;
+}
+
+/* ============================================================
+   FOR / NOT FOR
+   ============================================================ */
+.fit-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border:1px solid var(--paper-line);
+}
+.fit-col{padding:56px 52px;}
+.fit-col + .fit-col{border-left:1px solid var(--paper-line);}
+@media (max-width:820px){
+  .fit-grid{grid-template-columns:1fr;}
+  .fit-col + .fit-col{border-left:none;border-top:1px solid var(--paper-line);}
+}
+.fit-col h3{margin-bottom:32px;}
+.fit-col.yes h3{color:var(--brass-deep);}
+.fit-col.no h3{color:var(--text-on-paper-mute);}
+.fit-list li{
+  padding:18px 0;
+  border-top:1px solid var(--paper-line);
+  font-size:0.98rem;
+  color:var(--text-on-paper-mute);
+  display:flex;gap:14px;
+}
+.fit-list li:last-child{padding-bottom:0;}
+.fit-mark{font-family:var(--mono);font-size:12px;color:var(--brass);flex-shrink:0;padding-top:3px;}
+.fit-col.no .fit-mark{color:var(--text-on-paper-mute);}
+
+/* ============================================================
+   DELIVERABLES / BONUS lists
+   ============================================================ */
+.deliv-list{border-top:1px solid var(--ink-line);}
+.deliv-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:24px;
+  padding:34px 0;
+  border-bottom:1px solid var(--ink-line);
+  align-items:baseline;
+}
+.deliv-row h3{color:var(--text-on-ink);font-size:1.2rem;margin-bottom:8px;}
+.deliv-row p{color:var(--text-on-ink-mute);font-size:0.95rem;max-width:54ch;}
+.deliv-value{
+  font-family:var(--mono);
+  font-size:0.92rem;
+  color:var(--text-on-ink-mute);
+  white-space:nowrap;
+}
+
+.bonus-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--paper-line);}
+.bonus-card{padding:48px;}
+.bonus-card + .bonus-card{border-left:1px solid var(--paper-line);}
+@media (max-width:800px){
+  .bonus-grid{grid-template-columns:1fr;}
+  .bonus-card + .bonus-card{border-left:none;border-top:1px solid var(--paper-line);}
+}
+.bonus-tag{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:var(--brass);text-transform:uppercase;display:block;margin-bottom:18px;}
+.bonus-card h3{margin-bottom:14px;}
+.bonus-card p{color:var(--text-on-paper-mute);font-size:0.98rem;margin-bottom:22px;}
+.bonus-value{font-family:var(--mono);font-size:0.92rem;color:var(--text-on-paper-mute);border-top:1px solid var(--paper-line);padding-top:16px;}
+
+/* ============================================================
+   VALUE STACK / PRICE
+   ============================================================ */
+.stack-panel{
+  border:1px solid var(--ink-line);
+  padding:clamp(36px,5vw,72px);
+}
+.stack-row{
+  display:flex;
+  justify-content:space-between;
+  padding:20px 0;
+  border-bottom:1px solid var(--ink-line);
+  font-size:0.98rem;
+  color:var(--text-on-ink-mute);
+}
+.stack-row span:last-child{font-family:var(--mono);color:var(--text-on-ink);}
+.stack-total{
+  display:flex;justify-content:space-between;
+  padding-top:32px;
+  align-items:baseline;
+}
+.stack-total .label{font-family:var(--mono);font-size:12px;letter-spacing:0.08em;color:var(--text-on-ink-mute);text-transform:uppercase;}
+.stack-total .value{font-family:var(--serif);font-size:1.4rem;color:var(--text-on-ink-mute);text-decoration:line-through;text-decoration-color:rgba(244,241,233,0.25);}
+.stack-price{
+  margin-top:14px;
+  display:flex;
+  align-items:baseline;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.stack-price .amount{font-family:var(--serif);font-size:clamp(2.4rem,4vw,3.4rem);color:var(--brass-light);}
+.stack-price .terms{font-family:var(--mono);font-size:0.85rem;color:var(--text-on-ink-mute);}
+.stack-cta{margin-top:40px;display:flex;flex-direction:column;gap:16px;align-items:flex-start;}
+
+/* ============================================================
+   TESTIMONIALS FULL
+   ============================================================ */
+.testi-list{display:flex;flex-direction:column;}
+.testi{
+  display:grid;
+  grid-template-columns:1fr 1.4fr;
+  gap:64px;
+  padding:64px 0;
+  border-top:1px solid var(--paper-line);
+}
+.testi:last-child{border-bottom:1px solid var(--paper-line);}
+@media (max-width:860px){.testi{grid-template-columns:1fr;gap:24px;}}
+.testi-tag{font-family:var(--mono);font-size:11px;color:var(--text-on-paper-mute);letter-spacing:0.06em;text-transform:uppercase;}
+.testi-name-block h3{margin-top:14px;margin-bottom:6px;}
+.testi-name-block .role{font-size:0.9rem;color:var(--text-on-paper-mute);}
+.testi-body p{color:var(--text-on-paper-mute);font-size:0.98rem;margin-bottom:16px;}
+.testi-body p strong{color:var(--text-on-paper);font-weight:500;background:linear-gradient(to bottom, transparent 62%, rgba(169,130,76,0.25) 62%);}
+.testi-result{
+  margin-top:20px;
+  padding-top:20px;
+  border-top:1px solid var(--paper-line);
+  font-family:var(--serif);
+  font-style:italic;
+  font-size:1.08rem;
+  color:var(--text-on-paper);
+}
+
+/* ============================================================
+   SUPPORT / GUARANTEE
+   ============================================================ */
+.support-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:48px;}
+@media (max-width:800px){.support-grid{grid-template-columns:1fr;}}
+.support-item{border-top:1px solid var(--paper-line);padding-top:28px;}
+.support-item .small-caps{display:block;margin-bottom:14px;}
+.support-item p{color:var(--text-on-paper-mute);font-size:0.96rem;}
+
+.guarantee{
+  text-align:center;
+  padding-top:130px;padding-bottom:130px;
+}
+.guarantee-mark{
+  width:64px;height:64px;
+  border:1px solid var(--brass-light);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 36px auto;
+  font-family:var(--serif);
+  font-style:italic;
+  color:var(--brass-light);
+  font-size:1.4rem;
+}
+.guarantee h2{max-width:22ch;margin:0 auto 24px auto;}
+.guarantee p{margin:0 auto;}
+
+/* ============================================================
+   AUTHORITY
+   ============================================================ */
+.authority{display:grid;grid-template-columns:0.7fr 1.3fr;gap:72px;align-items:start;}
+@media (max-width:860px){.authority{grid-template-columns:1fr;gap:36px;}}
+.authority-figure{
+  aspect-ratio:4/5;
+  border:1px solid var(--paper-line);
+  background:linear-gradient(155deg, var(--paper-dim), var(--paper));
+  position:relative;
+  overflow:hidden;
+}
+.authority-figure svg{position:absolute;inset:0;width:100%;height:100%;}
+.authority-copy p{color:var(--text-on-paper-mute);margin-bottom:22px;font-size:1.01rem;}
+.authority-copy .journey{font-family:var(--serif);font-style:italic;font-size:1.1rem;color:var(--text-on-paper);border-left:1px solid var(--brass);padding-left:24px;margin-top:32px;}
+
+/* ============================================================
+   FAQ
+   ============================================================ */
+.faq-item{border-top:1px solid var(--paper-line);}
+.faq-item:last-child{border-bottom:1px solid var(--paper-line);}
+.faq-q{
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:24px;
+  padding:30px 0;
+  text-align:left;
+  font-family:var(--serif);
+  font-size:1.08rem;
+  color:var(--text-on-paper);
+}
+.faq-plus{
+  font-family:var(--mono);
+  font-size:18px;
+  color:var(--brass);
+  transition:transform 0.4s var(--ease);
+  flex-shrink:0;
+}
+.faq-item.open .faq-plus{transform:rotate(45deg);}
+.faq-a{
+  max-height:0;
+  overflow:hidden;
+  transition:max-height 0.5s var(--ease);
+}
+.faq-a p{color:var(--text-on-paper-mute);font-size:0.98rem;padding-bottom:30px;max-width:66ch;}
+.faq-item.open .faq-a{max-height:400px;}
+
+/* ============================================================
+   FINAL OFFER / FOOTER
+   ============================================================ */
+.final{text-align:center;padding-top:150px;padding-bottom:110px;}
+.final h2{max-width:20ch;margin:0 auto 20px auto;color:var(--text-on-ink);}
+.final .lede{margin:0 auto 56px auto;}
+.final-panel{
+  max-width:640px;
+  margin:0 auto;
+  border:1px solid var(--ink-line);
+  padding:clamp(32px,5vw,56px);
+  text-align:left;
+}
+.final-list{margin-bottom:36px;}
+.final-list li{
+  display:flex;
+  gap:14px;
+  padding:14px 0;
+  border-top:1px solid var(--ink-line);
+  font-size:0.96rem;
+  color:var(--text-on-ink-mute);
+}
+.final-list li:first-child{border-top:none;}
+.final-list .fit-mark{color:var(--brass);}
+.final-total{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding-top:24px;border-top:1px solid var(--ink-line);margin-bottom:4px;
+}
+.final-total .label{font-family:var(--mono);font-size:11px;color:var(--text-on-ink-mute);text-transform:uppercase;letter-spacing:0.08em;}
+.final-total .value{font-family:var(--serif);font-size:1.15rem;color:var(--text-on-ink-mute);text-decoration:line-through;text-decoration-color:rgba(244,241,233,0.25);}
+.final-price{margin-bottom:32px;}
+.final-price .amount{font-family:var(--serif);font-size:clamp(2.2rem,4vw,2.8rem);color:var(--brass-light);}
+.final-price .terms{font-family:var(--mono);font-size:0.82rem;color:var(--text-on-ink-mute);display:block;margin-top:6px;}
+.final .btn-primary{width:100%;justify-content:center;}
+.final-note{margin-top:24px;font-size:0.86rem;color:var(--text-on-ink-mute);text-align:center;}
+.final-legal{margin-top:14px;font-size:0.78rem;color:var(--text-on-ink-mute);opacity:0.6;text-align:center;}
+
+.footer{
+  padding:48px var(--gutter);
+  display:flex;justify-content:space-between;align-items:center;
+  border-top:1px solid var(--ink-line-soft);
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--text-on-ink-mute);
+}
+@media (max-width:600px){.footer{flex-direction:column;gap:12px;text-align:center;}}
+
+.divider-hair{height:1px;background:var(--paper-line);width:100%;}
+.on-ink .divider-hair{background:var(--ink-line);}
+
+/* section label row */
+.section-label-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:64px;flex-wrap:wrap;gap:24px;}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAV
+============================================================ -->
+<nav class="nav" id="nav">
+  <a href="#hero" class="nav-logo"><span class="dot"></span>ProverPrev</a>
+  <div class="nav-links">
+    <a href="#metodo">Método</a>
+    <a href="#paraquem">Para quem é</a>
+    <a href="#depoimentos">Depoimentos</a>
+    <a href="#faq">Perguntas</a>
+  </div>
+  <a href="#oferta" class="nav-cta">Começar diagnóstico</a>
+</nav>
+
+<!-- ============================================================
+     HERO
+============================================================ -->
+<section id="hero" class="on-ink grain hero">
+  <svg class="hero-bg-curve" id="heroCurve" viewBox="0 0 600 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path id="heroPath" d="M20,700 C120,650 140,480 220,420 C300,360 340,220 420,160 C470,120 520,90 580,60" stroke="url(#curveGrad)" stroke-width="1"/>
+    <defs>
+      <linearGradient id="curveGrad" x1="0" y1="800" x2="600" y2="0" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#A9824C" stop-opacity="0"/>
+        <stop offset="0.5" stop-color="#CBA876" stop-opacity="0.9"/>
+        <stop offset="1" stop-color="#F4F1E9" stop-opacity="0.4"/>
+      </linearGradient>
+    </defs>
+    <circle id="heroDot" cx="580" cy="60" r="3.5" fill="#CBA876"/>
+  </svg>
+
+  <div class="wrap hero-inner">
+    <div class="hero-text">
+      <span class="eyebrow">Protocolo Data Certa</span>
+      <h1 class="reveal is-visible">Toda mulher tem uma data exata pra parar de trabalhar.</h1>
+      <p class="lede reveal is-visible reveal-delay-1">A maioria só descobre isso anos depois do que precisava, tentando entender sozinha regras que mudam a cada reforma.</p>
+
+      <div class="hero-cta-row reveal is-visible reveal-delay-2">
+        <a href="#oferta" class="btn btn-primary">Quero saber minha data certa <span class="btn-arrow">→</span></a>
+        <span class="hero-cta-note">Diagnóstico com base no seu histórico real</span>
+      </div>
+    </div>
+
+    <div class="hero-list reveal is-visible reveal-delay-3">
+      <div class="hero-list-row">
+        <span class="hero-list-index">I</span>
+        <span class="hero-list-title">As regras mudam a cada poucos anos</span>
+        <span class="hero-list-desc">Quem não acompanha perde o ponto exato de sair mais cedo. Você passa a saber, mês a mês, quanto falta e por qual caminho.</span>
+      </div>
+      <div class="hero-list-row">
+        <span class="hero-list-index">II</span>
+        <span class="hero-list-title">Contribuições somem do cálculo</span>
+        <span class="hero-list-desc">Períodos fora de ordem ou com lacunas se perdem se ninguém revisar o histórico a tempo. Você recebe a correção antes que vire prejuízo no valor final.</span>
+      </div>
+      <div class="hero-list-row">
+        <span class="hero-list-index">III</span>
+        <span class="hero-list-title">Decisão sem orientação custa caro</span>
+        <span class="hero-list-desc">Anos de espera a mais ou centenas de reais a menos por mês. Você sai com um plano de três etapas, escrito, com prazo definido.</span>
+      </div>
+    </div>
+
+    <div class="hero-video reveal is-visible reveal-delay-4">
+      <div class="play-ring"></div>
+      <span class="hero-video-label">Assista — como funciona o diagnóstico · 3 min</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PROBLEM
+============================================================ -->
+<section class="on-paper section-pad">
+  <div class="wrap problem-grid">
+    <div class="problem-sticky reveal">
+      <span class="eyebrow">O que trava você</span>
+      <h2>Por que você trava toda vez que tenta entender sua aposentadoria sozinha</h2>
+    </div>
+
+    <div class="problem-scenes">
+      <div class="scene reveal">
+        <span class="tag">Segunda de manhã</span>
+        <p>Você já entrou pelo menos três vezes no Meu INSS, antes de sair pro trabalho, tentando decifrar o extrato de contribuição, e fechou o aplicativo sem entender o que os números significavam.</p>
+      </div>
+      <div class="scene reveal">
+        <span class="tag">A colega de trabalho</span>
+        <p>Você já perguntou pra uma colega que também está perto de se aposentar, e ela respondeu com uma informação que ouviu de outra pessoa, que por sua vez tinha lido num grupo de WhatsApp. As duas ficaram na mesma dúvida.</p>
+      </div>
+      <div class="scene reveal">
+        <span class="tag">A conta de cabeça</span>
+        <p>Você já calculou quantos anos ainda faltavam, chegou num número, e meses depois descobriu que a regra usada não era mais a válida, porque tinha mudado numa reforma que você nem soube que tinha acontecido.</p>
+      </div>
+      <div class="scene reveal">
+        <span class="tag">O silêncio em casa</span>
+        <p>Você evita comentar isso com a família porque, depois de décadas trabalhando e criando os filhos, parece estranho admitir que não entende uma coisa que devia ser simples.</p>
+      </div>
+
+      <div class="problem-close reveal">
+        <p>Isso não acontece porque falta capacidade. Acontece porque as regras foram reescritas várias vezes desde 2019, e cada reforma criou uma regra de transição diferente. Ninguém trocou a legenda depois de mudar o mapa.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SOCIAL PROOF SHORT
+============================================================ -->
+<section class="on-ink grain">
+  <div class="wrap" style="padding-top:96px;">
+    <span class="eyebrow reveal">Diagnósticos recentes</span>
+    <h2 class="reveal" style="color:var(--text-on-ink); margin-bottom:64px;">O que essas mulheres descobriram quando pararam de adivinhar</h2>
+  </div>
+  <div class="proof-strip">
+    <div class="proof-card reveal">
+      <span class="proof-name">Marta Aparecida, 52</span>
+      <span class="proof-meta">Contadora autônoma · MEI</span>
+      <p>Não sabia se o tempo como MEI contava. Em 3 semanas, recebeu a contagem exata e descobriu que faltavam 14 meses, não os 3 anos que imaginava.</p>
+    </div>
+    <div class="proof-card reveal reveal-delay-1">
+      <span class="proof-name">Regina Costa, 49</span>
+      <span class="proof-meta">CLT há 26 anos</span>
+      <p>Adiava o assunto por medo de mexer errado. Depois do diagnóstico, descobriu a regra de transição mais vantajosa e organizou a saída pros próximos 18 meses.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     MID CTA
+============================================================ -->
+<section class="on-ink grain midcta">
+  <div class="wrap midcta-inner reveal">
+    <h2 style="color:var(--text-on-ink);">A saída existe e está pronta</h2>
+    <p class="lede" style="text-align:center;margin-bottom:40px;">Se alguma dessas cenas parece familiar, o próximo passo é simples de dar.</p>
+    <a href="#oferta" class="btn btn-primary">Quero meu diagnóstico completo <span class="btn-arrow">→</span></a>
+  </div>
+</section>
+
+<!-- ============================================================
+     METHOD
+============================================================ -->
+<section id="metodo" class="on-paper section-pad">
+  <div class="wrap">
+    <div class="method-head reveal">
+      <span class="eyebrow">O protocolo</span>
+      <h2>Por que o simulador que você usou nunca ia te dar a resposta certa</h2>
+      <p class="body-text">O ProverPrev aplica o <strong>Protocolo Data Certa</strong>, uma sequência de três etapas que transforma seu histórico de contribuição, hoje espalhado e ilegível, numa data e num caminho definidos.</p>
+    </div>
+
+    <div class="timeline" id="timeline">
+      <div class="timeline-rail">
+        <div class="timeline-rail-track"></div>
+        <div class="timeline-rail-fill" id="railFill"></div>
+      </div>
+      <div class="timeline-steps">
+        <div class="tl-step reveal" data-step>
+          <span class="tl-dot"></span>
+          <span class="tl-num">Etapa 01</span>
+          <h3>Diagnóstico previdenciário completo</h3>
+          <p>Levantamento do CNIS, cruzamento de todos os vínculos, identificação de lacunas, períodos rurais ou especiais esquecidos, e simulação nas regras de transição aplicáveis ao seu caso.</p>
+        </div>
+        <div class="tl-step reveal" data-step>
+          <span class="tl-dot"></span>
+          <span class="tl-num">Etapa 02</span>
+          <h3>Plano de ação em três frentes</h3>
+          <p>Definição da regra mais vantajosa, lista do que precisa ser corrigido antes de dar entrada, e cronograma com data estimada.</p>
+        </div>
+        <div class="tl-step reveal" data-step>
+          <span class="tl-dot"></span>
+          <span class="tl-num">Etapa 03</span>
+          <h3>Acompanhamento mensal</h3>
+          <p>Revisão do plano à medida que novas contribuições entram ou a legislação muda, pra garantir que a data continua valendo.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="method-foot">
+      <p class="reveal">Antes, decidir sozinha significava escolher entre esperar a idade mínima sem saber se era a melhor opção, ou correr pro INSS com um cálculo de simulador genérico que não considera contribuições fora de ordem. Depois, a resposta é única, baseada no histórico real de quem busca o diagnóstico.</p>
+      <p class="method-highlight reveal">Numa das análises recentes, uma cliente com 26 anos de contribuição descobriu que estava dois anos mais perto da aposentadoria do que imaginava, porque nunca tinha considerado a regra de pontos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOR / NOT FOR
+============================================================ -->
+<section id="paraquem" class="on-paper-dim section-pad">
+  <div class="wrap">
+    <div class="section-label-row reveal">
+      <h2>Pra quem o Protocolo Data Certa foi desenhado, e pra quem não foi</h2>
+    </div>
+    <div class="fit-grid reveal">
+      <div class="fit-col yes">
+        <h3>Para quem é</h3>
+        <ul class="fit-list">
+          <li><span class="fit-mark">＋</span>Mulheres entre 45 e 58 anos que já contribuem há mais de 15 anos e querem saber a data real de saída.</li>
+          <li><span class="fit-mark">＋</span>CLT ou autônomas que já tentaram entender pelo Meu INSS e travaram na primeira tela.</li>
+          <li><span class="fit-mark">＋</span>Quem tem lacunas de contribuição, trocou de regime ou teve períodos como MEI e não sabe como isso conta.</li>
+          <li><span class="fit-mark">＋</span>Quem prefere ter um plano por escrito, em vez de confiar num cálculo de aplicativo genérico.</li>
+          <li><span class="fit-mark">＋</span>Quem quer decidir com um ano ou mais de antecedência, não na véspera.</li>
+        </ul>
+      </div>
+      <div class="fit-col no">
+        <h3>Para quem não é</h3>
+        <ul class="fit-list">
+          <li><span class="fit-mark">－</span>Quem já tem processo aberto com advogado previdenciário e só precisa de acompanhamento jurídico do caso.</li>
+          <li><span class="fit-mark">－</span>Quem quer resposta em 24 horas sem enviar nenhum documento.</li>
+          <li><span class="fit-mark">－</span>Quem está satisfeita usando só o simulador do Meu INSS e não sente necessidade de revisão.</li>
+          <li><span class="fit-mark">－</span>Quem busca garantia de um valor específico de benefício — isso depende das regras do INSS, não da consultoria.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     DELIVERABLES
+============================================================ -->
+<section class="on-ink grain section-pad">
+  <div class="wrap">
+    <div class="section-label-row reveal">
+      <div>
+        <span class="eyebrow">O que você recebe</span>
+        <h2 style="color:var(--text-on-ink);">O que exatamente você recebe quando fecha o diagnóstico</h2>
+      </div>
+    </div>
+
+    <div class="deliv-list reveal">
+      <div class="deliv-row">
+        <div><h3>Diagnóstico previdenciário completo</h3><p>Levantamento de CNIS, vínculos e lacunas.</p></div>
+        <span class="deliv-value">R$ 497</span>
+      </div>
+      <div class="deliv-row">
+        <div><h3>Plano de ação em 3 etapas</h3><p>Por escrito, com cronograma.</p></div>
+        <span class="deliv-value">R$ 397</span>
+      </div>
+      <div class="deliv-row">
+        <div><h3>Acompanhamento mensal — 6 meses</h3><p>Ajuste do plano conforme a legislação muda.</p></div>
+        <span class="deliv-value">R$ 1.182</span>
+      </div>
+      <div class="deliv-row">
+        <div><h3>Checklist de Documentos Sem Furo</h3><p>Tudo que reunir antes de qualquer conversa com o INSS.</p></div>
+        <span class="deliv-value">R$ 147</span>
+      </div>
+      <div class="deliv-row">
+        <div><h3>Grupo de Suporte com Acompanhamento Direto</h3><p>Canal direto pra dúvidas pontuais.</p></div>
+        <span class="deliv-value">R$ 197</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     BONUS
+============================================================ -->
+<section class="on-paper section-pad">
+  <div class="wrap">
+    <div class="section-label-row reveal">
+      <h2>O que vem junto pra fechar as pontas que o diagnóstico sozinho não resolve</h2>
+    </div>
+    <div class="bonus-grid reveal">
+      <div class="bonus-card">
+        <span class="bonus-tag">Bônus 01</span>
+        <h3>Checklist de Documentos Sem Furo</h3>
+        <p>Lista organizada de tudo que você precisa reunir antes de qualquer conversa com o INSS — carteiras, CNIS, comprovantes — pra você não descobrir um documento faltando no meio do processo.</p>
+        <span class="bonus-value">Valor avulso — R$ 147</span>
+      </div>
+      <div class="bonus-card">
+        <span class="bonus-tag">Bônus 02</span>
+        <h3>Grupo de Suporte com Acompanhamento Direto</h3>
+        <p>Canal direto pra tirar dúvida pontual entre as sessões de acompanhamento mensal, sem esperar a próxima call marcada.</p>
+        <span class="bonus-value">Valor avulso — R$ 197</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VALUE STACK
+============================================================ -->
+<section class="on-ink grain section-pad">
+  <div class="wrap" style="max-width:760px;">
+    <div class="section-label-row reveal">
+      <div>
+        <span class="eyebrow">O investimento</span>
+        <h2 style="color:var(--text-on-ink);">Quanto vale tudo isso somado, e quanto você paga hoje</h2>
+      </div>
+    </div>
+
+    <div class="stack-panel reveal">
+      <div class="stack-row"><span>Diagnóstico previdenciário completo</span><span>R$ 497</span></div>
+      <div class="stack-row"><span>Plano de ação em 3 etapas</span><span>R$ 397</span></div>
+      <div class="stack-row"><span>Acompanhamento mensal (6 meses)</span><span>R$ 1.182</span></div>
+      <div class="stack-row"><span>Checklist de Documentos Sem Furo</span><span>R$ 147</span></div>
+      <div class="stack-row" style="border-bottom:none;"><span>Grupo de Suporte com Acompanhamento Direto</span><span>R$ 197</span></div>
+
+      <div class="stack-total">
+        <span class="label">Valor total dos componentes</span>
+        <span class="value">R$ 2.420</span>
+      </div>
+      <div class="stack-price">
+        <span class="amount">R$ 997</span>
+        <span class="terms">ou 10x de R$ 109,90</span>
+      </div>
+      <div class="stack-cta">
+        <a href="#oferta" class="btn btn-primary">Quero meu diagnóstico ProverPrev <span class="btn-arrow">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TESTIMONIALS FULL
+============================================================ -->
+<section id="depoimentos" class="on-paper section-pad">
+  <div class="wrap">
+    <div class="section-label-row reveal">
+      <h2>O que aconteceu com quem já teve a data confirmada</h2>
+    </div>
+
+    <div class="testi-list">
+      <div class="testi reveal">
+        <div class="testi-name-block">
+          <span class="testi-tag">Antes</span>
+          <h3>Nome real — substituir</h3>
+          <span class="role">CLT há 24 anos</span>
+        </div>
+        <div class="testi-body">
+          <p>Tinha ouvido de uma colega que faltavam 6 anos, mas nunca tinha confirmado com um profissional. Aplicou o Protocolo Data Certa e descobriu uma lacuna de 8 meses num vínculo antigo que nem lembrava mais.</p>
+          <div class="testi-result">Depois de regularizar o período, <strong>a data de saída caiu de 6 anos para 3 anos e 4 meses</strong>, com plano escrito e prazo definido.</div>
+        </div>
+      </div>
+
+      <div class="testi reveal">
+        <div class="testi-name-block">
+          <span class="testi-tag">Antes</span>
+          <h3>Nome real — substituir</h3>
+          <span class="role">Autônoma há 12 anos</span>
+        </div>
+        <div class="testi-body">
+          <p>Contribuía de forma irregular e não sabia se o tempo como MEI contava pra aposentadoria. O diagnóstico cruzou todo o histórico e apontou qual regime de contribuição valia mais a pena manter dali pra frente.</p>
+          <div class="testi-result">Em 5 meses ajustou o plano e <strong>projetou economia de R$ 6.200 por ano</strong> em contribuições que estava pagando a mais.</div>
+        </div>
+      </div>
+
+      <div class="testi reveal">
+        <div class="testi-name-block">
+          <span class="testi-tag">Antes</span>
+          <h3>Nome real — substituir</h3>
+          <span class="role">CLT, 51 anos</span>
+        </div>
+        <div class="testi-body">
+          <p>Adiava o assunto porque tinha medo de descobrir que faltava muito tempo ainda. Com o plano de ação em três etapas, entendeu exatamente qual regra de transição usar e o que fazer nos meses seguintes.</p>
+          <div class="testi-result"><strong>Teve a data de saída confirmada em 22 meses</strong>, com acompanhamento mensal garantindo que nada mudasse no meio do caminho.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SUPPORT
+============================================================ -->
+<section class="on-paper-dim section-pad">
+  <div class="wrap">
+    <div class="section-label-row reveal">
+      <h2>Você não fica sozinha depois do diagnóstico</h2>
+    </div>
+    <div class="support-grid reveal">
+      <div class="support-item">
+        <span class="small-caps">Canais</span>
+        <p>Grupo de acompanhamento direto por WhatsApp e sessões mensais de revisão do plano.</p>
+      </div>
+      <div class="support-item">
+        <span class="small-caps">Frequência</span>
+        <p>Revisão mensal do plano, com resposta a dúvidas pontuais em até 48 horas úteis.</p>
+      </div>
+      <div class="support-item">
+        <span class="small-caps">Quem responde</span>
+        <p>A própria equipe do ProverPrev, que conduziu o diagnóstico original.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     GUARANTEE
+============================================================ -->
+<section class="on-ink grain guarantee">
+  <div class="wrap reveal">
+    <div class="guarantee-mark">7</div>
+    <h2 style="color:var(--text-on-ink);">O risco fica com a gente, não com você</h2>
+    <p class="lede" style="text-align:center;">Você recebe o diagnóstico, acessa o plano de ação e, se dentro dos primeiros 7 dias decidir que não é pra você, devolvemos 100% do valor pago. Sem pergunta, sem formulário, sem burocracia.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     AUTHORITY
+============================================================ -->
+<section class="on-paper section-pad">
+  <div class="wrap authority">
+    <div class="authority-figure reveal">
+      <svg viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="100" x2="400" y2="100" stroke="rgba(18,16,12,0.08)"/>
+        <line x1="0" y1="250" x2="400" y2="250" stroke="rgba(18,16,12,0.08)"/>
+        <line x1="0" y1="400" x2="400" y2="400" stroke="rgba(18,16,12,0.08)"/>
+        <circle cx="200" cy="230" r="72" fill="none" stroke="#A9824C" stroke-width="1"/>
+        <circle cx="200" cy="230" r="1.5" fill="#A9824C"/>
+      </svg>
+    </div>
+    <div class="authority-copy reveal">
+      <span class="eyebrow">Quem está por trás</span>
+      <h2 style="margin-bottom:28px;">Quem está por trás do Protocolo Data Certa</h2>
+      <p>[Nome da responsável], responsável pelo ProverPrev — substituir por: quantos diagnósticos já foram feitos, quantos casos de lacuna já foram identificados e corrigidos, algum caso de destaque com resultado numérico, formação ou credencial concreta ligada à área previdenciária.</p>
+      <p class="journey">[Substituir por uma frase real sobre o que motivou a criação do ProverPrev — uma fragilidade ou situação concreta que levou à criação do Protocolo Data Certa.]</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FAQ
+============================================================ -->
+<section id="faq" class="on-paper-dim section-pad">
+  <div class="wrap" style="max-width:840px;">
+    <div class="section-label-row reveal">
+      <h2>As perguntas que quase todo mundo faz antes de fechar</h2>
+    </div>
+
+    <div class="faq-list reveal" id="faqList">
+      <div class="faq-item">
+        <button class="faq-q">Não tenho tempo pra reunir tudo, isso ainda funciona pra mim?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>O diagnóstico começa com o que você já tem hoje, mesmo que seja só o CNIS baixado pelo aplicativo. A partir daí, o próprio plano de ação indica o que falta reunir e em que ordem.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">R$ 997 ou 10x de R$ 109,90 é caro pra mim agora, existe outra forma de pagar?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>O parcelamento em 10x de R$ 109,90 existe justamente pra caber no orçamento mensal. Comparado ao custo médio de uma consultoria previdenciária completa, entre R$ 1.000 e R$ 5.000, o valor fica abaixo da média pelo mesmo escopo de diagnóstico e acompanhamento.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Não entendo nada de INSS, isso é um problema?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>Não é preciso entender antes de começar. O diagnóstico traduz seu histórico de contribuição pra linguagem simples e aponta a regra que se aplica a você.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">E se o diagnóstico não encontrar nenhuma melhoria pro meu caso?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>Mesmo quando a regra mais vantajosa já é a que você imaginava, você sai com a confirmação por escrito e uma data definida, em vez de continuar na dúvida. E se dentro de 7 dias sentir que não era o que precisava, o valor é devolvido integralmente.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Qual a diferença entre isso e usar o simulador do Meu INSS sozinha?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>O simulador do Meu INSS aplica uma regra padrão, sem cruzar lacunas, tempo especial ou rural, nem apontar qual das regras de transição é mais vantajosa pro seu caso. O Protocolo Data Certa faz essa análise cruzada e entrega o plano junto, não só o número.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Preciso já ter certeza que vou me aposentar em breve?<span class="faq-plus">+</span></button>
+        <div class="faq-a"><p>Não. Quem descobre a data com um ano ou mais de antecedência tem mais tempo pra corrigir lacunas ou ajustar contribuições antes de dar entrada, o que costuma resultar num benefício maior do que quem decide na última hora.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FINAL OFFER
+============================================================ -->
+<section id="oferta" class="on-ink grain final">
+  <div class="wrap">
+    <span class="eyebrow" style="justify-content:center;">Última chamada</span>
+    <h2 style="margin-left:auto;margin-right:auto;text-align:center;">A data que você quer saber está a um diagnóstico de distância</h2>
+    <p class="lede" style="text-align:center;">Ao fechar o ProverPrev hoje, o Protocolo Data Certa é aplicado ao seu histórico completo.</p>
+
+    <div class="final-panel reveal">
+      <ul class="final-list">
+        <li><span class="fit-mark">＋</span>Diagnóstico previdenciário completo</li>
+        <li><span class="fit-mark">＋</span>Plano de ação em 3 etapas, por escrito, com cronograma</li>
+        <li><span class="fit-mark">＋</span>Acompanhamento mensal por 6 meses</li>
+        <li><span class="fit-mark">＋</span>Bônus — Checklist de Documentos Sem Furo</li>
+        <li><span class="fit-mark">＋</span>Bônus — Grupo de Suporte com Acompanhamento Direto</li>
+      </ul>
+
+      <div class="final-total"><span class="label">Valor total ancorado</span><span class="value">R$ 2.420</span></div>
+      <div class="final-price">
+        <span class="amount">R$ 997</span>
+        <span class="terms">à vista ou 10x de R$ 109,90</span>
+      </div>
+
+      <a href="#" class="btn btn-primary">Quero meu diagnóstico ProverPrev agora <span class="btn-arrow">→</span></a>
+
+      <p class="final-note">Garantia incondicional de 7 dias. Se não for pra você, o valor volta integralmente.</p>
+      <p class="final-legal">Ao continuar, você concorda com os termos de uso e a política de privacidade.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="on-ink footer">
+  <span>ProverPrev — Protocolo Data Certa</span>
+  <span>© 2026. Todos os direitos reservados.</span>
+</footer>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* NAV background on scroll */
+  var nav = document.getElementById('nav');
+  function onScrollNav(){
+    if(window.scrollY > 40){ nav.classList.add('scrolled'); }
+    else{ nav.classList.remove('scrolled'); }
+  }
+  window.addEventListener('scroll', onScrollNav, {passive:true});
+  onScrollNav();
+
+  /* REVEAL ON SCROLL */
+  var revealEls = document.querySelectorAll('.reveal:not(.is-visible)');
+  if('IntersectionObserver' in window && !reduced){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.12, rootMargin:'0px 0px -60px 0px'});
+    revealEls.forEach(function(el){ io.observe(el); });
+  } else {
+    revealEls.forEach(function(el){ el.classList.add('is-visible'); });
+  }
+
+  /* FAQ ACCORDION */
+  document.querySelectorAll('.faq-item').forEach(function(item){
+    var btn = item.querySelector('.faq-q');
+    btn.addEventListener('click', function(){
+      var wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(function(o){ o.classList.remove('open'); });
+      if(!wasOpen){ item.classList.add('open'); }
+    });
+  });
+
+  /* HERO CURVE — subtle parallax + traveling dot */
+  var curve = document.getElementById('heroCurve');
+  if(curve && !reduced){
+    window.addEventListener('scroll', function(){
+      var y = window.scrollY;
+      curve.style.transform = 'translateY(' + (y*0.12) + 'px)';
+    }, {passive:true});
+  }
+
+  /* METHOD TIMELINE — scroll-linked fill + active dot */
+  var timeline = document.getElementById('timeline');
+  var railFill = document.getElementById('railFill');
+  var steps = document.querySelectorAll('.tl-step');
+
+  function updateTimeline(){
+    if(!timeline) return;
+    var rect = timeline.getBoundingClientRect();
+    var vh = window.innerHeight;
+    var total = rect.height;
+    var progressed = vh*0.6 - rect.top;
+    var fraction = Math.max(0, Math.min(1, progressed / total));
+    if(railFill) railFill.style.height = (fraction*100) + '%';
+
+    steps.forEach(function(step){
+      var sRect = step.getBoundingClientRect();
+      if(sRect.top < vh*0.65){ step.classList.add('active'); }
+      else{ step.classList.remove('active'); }
+    });
+  }
+  window.addEventListener('scroll', updateTimeline, {passive:true});
+  window.addEventListener('resize', updateTimeline);
+  updateTimeline();
+
+  /* PROBLEM STICKY / general parallax nudge on decorative dot */
+  var heroDot = document.getElementById('heroDot');
+  if(heroDot && !reduced){
+    heroDot.style.transition = 'r 0.6s ease';
+  }
+})();
+</script>
+
+</body>
+</html>
